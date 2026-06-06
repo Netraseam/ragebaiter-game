@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>IMPOSSIBLE WIN (PIXEL FIXED)</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+<style>
+body {
+    margin:0;
+    height:100vh;
+    background:#0b0f19;
+    overflow:hidden;
+    font-family:'Press Start 2P', monospace;
+    color:#fff;
+}
+
+/* BUTTON */
+button {
+    position:absolute;
+    padding:14px 18px;
+    font-size:12px;
+    background:#22c55e;
+    border:4px solid #0f172a;
+    color:#000;
+    cursor:pointer;
+    box-shadow: 4px 4px 0px #000;
+}
+
+/* MESSAGE */
+#msg {
+    position:absolute;
+    top:20px;
+    width:100%;
+    text-align:center;
+    font-size:10px;
+    transition:0.25s ease;
+    text-shadow:2px 2px 0px #000;
+}
+
+/* LEADERBOARD */
+#leaderboard {
+    position:absolute;
+    right:20px;
+    top:20px;
+    width:240px;
+    background:#111827;
+    padding:10px;
+    border:4px solid #000;
+    font-size:10px;
+    box-shadow: 6px 6px 0px #000;
+}
+
+#board {
+    margin-top:10px;
+    line-height:18px;
+}
+
+/* CONFETTI */
+.confetti {
+    position:absolute;
+    width:8px;
+    height:8px;
+    background:red;
+    top:0;
+    left:0;
+    animation: fall linear forwards;
+}
+
+@keyframes fall {
+    to {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div id="msg">TRY TO WIN</div>
+
+<div id="leaderboard">
+    <b>LEADERBOARD</b>
+    <div id="board"></div>
+</div>
+
+<button id="btn">WIN</button>
+
+<script>
+const btn = document.getElementById("btn");
+const msg = document.getElementById("msg");
+const board = document.getElementById("board");
+
+let x = window.innerWidth / 2;
+let y = window.innerHeight / 2;
+
+let gameWon = false;
+
+let leaderboard = JSON.parse(localStorage.getItem("lb") || "[]");
+
+function save(){
+    localStorage.setItem("lb", JSON.stringify(leaderboard));
+}
+
+function render(){
+    board.innerHTML = leaderboard
+        .slice(0,5)
+        .map((p,i)=>`#${i+1} ${p.name} - ${p.time}s`)
+        .join("<br>");
+}
+
+render();
+
+function clamp(v,min,max){
+    return Math.max(min, Math.min(max, v));
+}
+
+function escape(){
+    x += (Math.random()-0.5)*400;
+    y += (Math.random()-0.5)*400;
+}
+
+/* CONFETTI SYSTEM */
+let confettiLoop = null;
+
+function spawnConfetti(){
+    const c = document.createElement("div");
+    c.className = "confetti";
+
+    const colors = ["#22c55e","#facc15","#60a5fa","#f43f5e","#a78bfa"];
+    c.style.background = colors[Math.floor(Math.random()*colors.length)];
+
+    c.style.left = Math.random()*window.innerWidth + "px";
+    c.style.top = "-10px";
+
+    const size = 6 + Math.random()*8;
+    c.style.width = size + "px";
+    c.style.height = size + "px";
+
+    c.style.animationDuration = (2 + Math.random()*2) + "s";
+
+    document.body.appendChild(c);
+
+    setTimeout(()=>c.remove(), 4000);
+}
+
+function startConfetti(){
+    if(confettiLoop) return;
+
+    confettiLoop = setInterval(()=>{
+        for(let i=0;i<6;i++){
+            spawnConfetti();
+        }
+    }, 200);
+}
+
+/* messages */
+const messages = {
+    close: [
+        "NO WAY YOU STILL MISSED THAT",
+        "IT WAS LITERALLY FREE",
+        "BRO THAT WAS YOUR MOMENT",
+        "HOW DID YOU MISS THAT",
+        "THAT WAS PAINFUL TO WATCH",
+        "YOU HAD IT IN YOUR HANDS",
+        "BRO… IT WAS RIGHT THERE",
+        "EVEN THE BUTTON IS DISAPPOINTED"
+    ],
+    mid: [
+        "THIS IS JUST SAD",
+        "YOU’RE REALLY TRYING HUH",
+        "AVERAGE AT BEST",
+        "NOT LOOKING GOOD FOR YOU",
+        "YOU MOVE LIKE LAG",
+        "THIS ISN’T IT",
+        "BRO IS STRUGGLING"
+    ],
+    far: [
+        "GO BACK TO START 💀",
+        "YOU ARE NOT BUILT FOR THIS",
+        "WRONG GAME BRO",
+        "IT’S RUNNING FROM YOU",
+        "SKILL ISSUE DETECTED",
+        "YOU LOST BEFORE STARTING",
+        "BRO IS LOST IN THE SAUCE",
+        "TRY AGAIN… OR DON’T"
+    ]
+};
+
+function pick(arr){
+    return arr[Math.floor(Math.random()*arr.length)];
+}
+
+let lastMsgTime = 0;
+let lastType = "";
+
+function setMsg(text, type){
+    const now = Date.now();
+
+    if(type === lastType && now - lastMsgTime < 900) return;
+    if(now - lastMsgTime < 500) return;
+
+    lastMsgTime = now;
+    lastType = type;
+
+    msg.textContent = text;
+}
+
+/* WIN */
+function win(time){
+    gameWon = true;
+
+    msg.textContent = "YOU WIN";
+    btn.style.display = "none";
+
+    leaderboard.push({name:"YOU", time});
+    leaderboard.sort((a,b)=>a.time-b.time);
+
+    save();
+    render();
+
+    startConfetti();
+}
+
+let start = Date.now();
+
+/* movement */
+document.addEventListener("mousemove",(e)=>{
+    if(gameWon) return;
+
+    const dx = e.clientX - x;
+    const dy = e.clientY - y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+
+    if(dist < 60){
+        setMsg(pick(messages.close), "close");
+    } 
+    else if(dist < 160){
+        setMsg(pick(messages.mid), "mid");
+    } 
+    else {
+        setMsg(pick(messages.far), "far");
+    }
+
+    if(dist < 150){
+        x -= dx * 0.12;
+        y -= dy * 0.12;
+        escape();
+    }
+
+    const pad = 20;
+    x = clamp(x, pad, window.innerWidth - pad);
+    y = clamp(y, pad, window.innerHeight - pad);
+
+    btn.style.left = x + "px";
+    btn.style.top = y + "px";
+
+    if(dist < 12){
+        let time = ((Date.now() - start) / 1000).toFixed(2);
+        win(time);
+    }
+});
+
+setInterval(()=>{
+    if(!gameWon && Math.random() < 0.2) escape();
+}, 200);
+
+</script>
+
+</body>
+</html>
